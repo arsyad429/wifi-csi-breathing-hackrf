@@ -1,0 +1,4 @@
+trial_id,csi_path,metadata_path
+B_S1_P1_10,../output/GANTI_RUN_S1/csi.csv,metadata/B_S1_P1_10.final.json
+B_S2_P1_10,../output/GANTI_RUN_S2/csi.csv,metadata/B_S2_P1_10.final.json
+B_S3_P1_10,../output/GANTI_RUN_S3/csi.csv,metadata/B_S3_P1_10.final.json

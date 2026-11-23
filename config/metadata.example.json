@@ -1,0 +1,17 @@
+{
+  "session_id": "S1",
+  "subject_id": "P1",
+  "scenario": "breathing",
+  "target_bpm": 10,
+  "actual_breath_count": null,
+  "duration_s": 60,
+  "room": "ISI_RUANGAN",
+  "tx_device": "ISI_ROUTER_MILIK_KELOMPOK",
+  "rx_position": "ISI_POSISI_DAN_TINGGI_RX",
+  "subject_position": "ISI_JARAK_SUBJEK_DARI_LOS",
+  "orientation": "menghadap",
+  "observed_motion": "",
+  "note": "",
+  "tx_verified": false,
+  "tx_verification_note": "ISI_BUKTI_VALIDASI_PEMANCAR; CFO saja tidak cukup"
+}
