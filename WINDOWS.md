@@ -1,8 +1,10 @@
 # Menjalankan di Windows PowerShell
 
-Pipeline Python disiapkan untuk Windows, Linux, dan macOS. Halaman ini memberikan perintah **Windows native** dari instalasi sampai evaluasi; WSL tidak diperlukan. Pengujian yang telah dilakukan di workspace ini berlangsung di Linux. Validasi pada Windows asli dan capture dengan driver Windows tetap perlu dilakukan pada laptop pengguna; `selftest` disediakan untuk memeriksanya.
+Pipeline Python disiapkan untuk Windows, Linux, dan macOS. Halaman ini memberikan perintah **Windows native** dari instalasi sampai evaluasi; WSL tidak diperlukan. Pengujian otomatis software telah [lolos di GitHub Actions](https://github.com/arsyad429/wifi-csi-breathing-hackrf/actions/runs/45114659344) pada Windows, Linux, dan macOS dengan Python 3.11 serta 3.13. Pengujian tersebut memakai data sintetis tanpa radio. Capture dengan HackRF dan driver Windows tetap perlu diperiksa pada laptop pengguna; `doctor` dan pilot disediakan untuk tahap itu.
 
 ## 1. Lokasi proyek dan Python
+
+**Tujuan:** memastikan PowerShell memakai Python yang sesuai dan folder proyek aktifnya benar. Perintah berikut hanya memeriksa versi/memindahkan direktori kerja; belum ada data radio yang diambil.
 
 Gunakan Windows 10/11 64-bit dengan Python 3.10+ 64-bit dari [python.org](https://www.python.org/downloads/windows/). Buka PowerShell dan periksa:
 
@@ -17,6 +19,8 @@ Set-Location "C:\wifi-csi"
 ```
 
 ## 2. Penyiapan otomatis atau manual
+
+**Tujuan:** memasang dependensi dalam `.venv`, kemudian membuktikan software dapat dijalankan secara offline. Pilih salah satu cara otomatis atau manual; tidak perlu melakukan keduanya.
 
 Opsi otomatis, tanpa mengubah execution policy komputer secara permanen:
 
@@ -45,6 +49,8 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe .\case_b.py demo --seed 7
 ```
 
+`venv` membuat environment terpisah, `pip install` memasang paket, `doctor` memeriksa lingkungan/perangkat, `selftest` memeriksa kode, dan `demo` memperlihatkan alur dengan data buatan. Periksa `tests.txt` berakhir `OK` dan grafik demo bisa dibuka. Hasil demo tidak boleh dipakai sebagai hasil pengukuran napas.
+
 Interpreter `.venv` dipanggil langsung sehingga aktivasi PowerShell tidak wajib. Jika ingin memakai `python` sebagai singkatan, aktifkan environment:
 
 ```powershell
@@ -56,6 +62,8 @@ Jika aktivasi diblokir, gunakan kembali path lengkap `.\.venv\Scripts\python.exe
 
 ## 3. Merencanakan eksperimen
 
+**Tujuan:** menyiapkan jadwal dan identitas/kondisi setiap trial sebelum capture agar data dapat dilacak saat evaluasi. `plan` membuat template, `New-Item` menyiapkan folder kerja, `Copy-Item` menyalin contoh, dan `notepad` membuka salinannya untuk diisi.
+
 ```powershell
 .\.venv\Scripts\python.exe .\case_b.py plan
 New-Item -ItemType Directory -Force .\data\metadata | Out-Null
@@ -66,6 +74,8 @@ notepad .\data\metadata\pilot.json
 Isi metadata pilot: `scenario=pilot`, `subject_id=none`, target/count `null`, `duration_s=1`. Untuk pilot beacon saja yang perlu ≥20 paket, pakai 3 detik pada metadata dan perintah capture. Detail protokol tetap mengikuti [PANDUAN_IMPLEMENTASI.md](PANDUAN_IMPLEMENTASI.md).
 
 ## 4. HackRF Tools dan driver USB
+
+**Tujuan:** memungkinkan program Python memanggil tools native yang benar-benar dapat membuka HackRF. Memasang requirements Python belum membuktikan driver USB dan radio siap.
 
 Untuk capture, `hackrf_transfer.exe` dan `hackrf_info.exe` harus dapat dijalankan dari PowerShell, termasuk DLL dependensinya. Dokumentasi resmi HackRF saat ini menyediakan jalur binary melalui radioconda atau artefak build resmi. Ikuti tautan unduhan dari [Installing HackRF Software](https://hackrf.readthedocs.io/en/latest/installing_hackrf_software.html#windows-binaries); `pip install -r requirements.txt` memasang paket Python saja.
 
@@ -79,17 +89,23 @@ hackrf_info.exe
 .\.venv\Scripts\python.exe .\case_b.py doctor
 ```
 
+Pengubahan `$env:PATH` memberi tahu terminal lokasi program native. `Get-Command` memeriksa apakah `.exe` bisa ditemukan, sedangkan `hackrf_info.exe` memeriksa apakah perangkat dapat dibuka. Lanjutkan capture setelah radio terdeteksi; jika hanya mengerjakan analisis file lama, tahap perangkat ini tidak diperlukan.
+
 Bila memakai radioconda, terminal radioconda yang telah diaktifkan juga dapat menyediakan PATH dan DLL yang diperlukan. Python analisis tetap dapat memakai `.venv` proyek melalui path lengkap.
 
 Pasang driver yang sesuai hanya bila HackRF belum dapat dibuka. Jalur umum adalah [Zadig](https://zadig.akeo.ie/): sambungkan HackRF, pilih **Options → List All Devices**, pilih perangkat **HackRF One** yang benar, lalu pasang **WinUSB**. Rujukan: [HackRF host README](https://github.com/greatscottgadgets/hackrf/blob/main/host/README.md) dan [libusb Windows](https://github.com/libusb/libusb/wiki/Windows). Jangan memilih perangkat USB lain pada daftar. Tutup SDR# atau aplikasi lain yang sedang memegang HackRF sebelum `doctor`/capture.
 
 ## 5. Capture dan ekstraksi
 
+**Tujuan:** menguji kualitas radio melalui pilot lalu mengambil trial utama. `record` mengakses HackRF dan langsung mengekstrak CSI; `extract` hanya membaca raw yang sudah ada di disk. Pilih sesuai apakah data baru perlu direkam.
+
 Pilot, setelah metadata disesuaikan dan perangkat terdeteksi:
 
 ```powershell
 .\.venv\Scripts\python.exe .\case_b.py record --duration 1 --metadata .\data\metadata\pilot.json
 ```
+
+Periksa `qc.json`, histogram ADC, dan `bursts.csv`. Pilot dipakai untuk menyesuaikan kanal/gain/trafik; rekaman sesingkat ini bukan dasar estimasi napas 30 detik. Jika QC belum memenuhi batas, perbaiki lalu ulangi sebelum mengambil trial utama.
 
 Trial utama:
 
@@ -113,7 +129,11 @@ Jika ingin output lebih pendek atau di disk lain:
 
 Satu raw 60 s sekitar 2,4 GB. Gunakan disk dengan kapasitas cukup dan filesystem yang mendukung file besar. File 60 s masih di bawah batas 4 GB FAT32, tetapi capture yang lebih lama dapat melampauinya.
 
+**Keluaran tahap ini:** raw/CSI, QC, metadata, dan log pada path `OUTPUT: ...`. Selama capture utama, pengamat tetap harus menghitung napas aktual dan mencatat gerakan; skrip tidak menggantikan pekerjaan pengamat.
+
 ## 6. Ground truth dan analisis
+
+**Tujuan:** memberi analisis nilai pembanding aktual, lalu memeriksa apakah amplitudo dan spektrum satu trial layak ditafsirkan. File `.final.json` menampung pembaruan catatan operator tanpa mengubah metadata asli pada folder run.
 
 Ganti `NAMA_RUN_RECORD` dengan folder yang dicetak saat capture. Salin metadata hasil run agar blok QC ikut terbawa, lalu isi hitungan aktual dari pengamat:
 
@@ -124,9 +144,13 @@ notepad .\data\metadata\B_S1_P1_10.final.json
 .\.venv\Scripts\python.exe .\case_b.py analyze "$run\csi.csv" --metadata .\data\metadata\B_S1_P1_10.final.json
 ```
 
+`$run` menyimpan path hasil capture agar tidak diketik berulang. `Copy-Item` mempertahankan blok QC dari hasil ekstraksi; pada Notepad isi `actual_breath_count` dari hitungan pengamat. `analyze` bekerja offline untuk membuat `amplitude.png`, `spectrum.png`, dan `predictions.csv`. Periksa status/`reason` jika prediksi kosong; jangan mengganti GT dengan target metronom.
+
 JSON dibaca sebagai UTF-8 dengan/tanpa BOM, sehingga file UTF-8 yang disimpan melalui PowerShell 5.1 juga didukung. Jangan menyimpan metadata sebagai UTF-16. Menyunting dengan Notepad modern dan menyimpan UTF-8 adalah pilihan sederhana.
 
 ## 7. Evaluasi dan membuka hasil
+
+**Tujuan:** menilai kemampuan pada sesi/orang yang dipisahkan dari data latih dan membandingkan galat CSI dengan RSSI. Evaluasi baru bermakna setelah dataset menunjuk trial nyata dengan metadata final yang benar.
 
 ```powershell
 Copy-Item .\data\dataset.example.csv .\data\dataset.csv
@@ -136,6 +160,8 @@ notepad .\data\dataset.csv
 Invoke-Item .\output
 .\.venv\Scripts\python.exe -m pip freeze | Set-Content -Encoding UTF8 .\data\requirements_eksperimen.txt
 ```
+
+Salin/edit `dataset.csv` untuk mendaftarkan semua trial. `--split session` menahan satu sesi saat memilih carrier dari sesi lain; `--split person` menahan satu subjek. `Invoke-Item` membuka folder hasil, dan `pip freeze` menyimpan versi paket untuk reproduksi. Baca QC, coverage, dan jumlah pasangan bersama MAE; satu angka galat saja belum cukup untuk menilai metode.
 
 File dataset harus menunjuk CSV/metadata yang benar untuk semua trial. CSV mengizinkan slash `/` pada path Windows, misalnya `../output/NAMA_RUN/csi.csv`; untuk drive berbeda gunakan path absolut. Di JSON, backslash harus digandakan (`D:\\Data CSI\\file.cs8`) atau gunakan slash `/`. Pada argumen PowerShell, cukup kutip path: `"D:\Data CSI\file.cs8"`.
 
@@ -154,4 +180,4 @@ Di Windows, `command.txt` memakai sintaks PowerShell dengan operator `&`; `comma
 | JSON gagal dibaca | Simpan UTF-8, gunakan `null` untuk nilai kosong, jangan ada koma terakhir |
 | Ingin menjalankan di WSL | Ikuti bagian Linux dan USB passthrough; jangan campur `.venv` Windows dan Linux |
 
-Pengujian lintas OS disiapkan di `.github/workflows/test.yml` untuk dijalankan bila proyek dimasukkan ke GitHub. Workflow tidak merekam radio; perangkat dan driver perlu diuji lokal.
+Pengujian lintas OS dikonfigurasi di `.github/workflows/test.yml` dan berjalan melalui GitHub Actions saat push/pull request. Workflow tidak merekam radio; perangkat dan driver perlu diuji lokal.

@@ -15,9 +15,13 @@ cd wifi-csi-breathing-hackrf
 
 Repository publik memuat kode, panduan, konfigurasi/template, pengujian, dan PDF arahan kasus. `.venv/`, `output/`, raw `.cs8`, cache, dan file sementara dikecualikan melalui `.gitignore`; hasil demo dapat dibuat sendiri dengan perintah pada bagian 2.
 
+Pengujian otomatis software telah [lolos pada Windows, Linux, dan macOS dengan Python 3.11 serta 3.13](https://github.com/arsyad429/wifi-csi-breathing-hackrf/actions/runs/45114659344). Pengujian ini memakai data sintetis; capture dan akurasi napas dengan HackRF fisik perlu divalidasi melalui eksperimen.
+
 ## 1. Membuat virtual environment
 
 Gunakan Python **3.10 atau lebih baru**. Perintah berikut dijalankan dari folder proyek ini, bukan dari repo referensi.
+
+Tujuan tahap ini adalah menyiapkan interpreter dan paket khusus proyek sebelum memproses data. Ikuti blok OS Anda, kemudian gunakan interpreter `.venv` untuk perintah berikutnya.
 
 Ubuntu/Debian/WSL:
 
@@ -53,7 +57,19 @@ Setiap terminal baru perlu aktivasi lagi. Periksa dengan `python -c "import sys;
 
 Daftar versi lengkap yang telah diuji dalam `.venv` Linux/Python 3.13 disimpan di `data/requirements_teruji_linux_py313.txt`. Gunakan `requirements.txt` untuk instalasi awal lintas OS/Python; berkas versi teruji adalah rekam jejak lingkungan pengujian ini.
 
+| Langkah instalasi | Untuk apa dan apa yang dilakukan? |
+| --- | --- |
+| Pasang Python/HackRF Tools melalui OS | Menyediakan interpreter dan program native untuk mengakses radio; paket Python saja tidak memasang driver/CLI HackRF. |
+| `python3 -m venv .venv` atau `py -3 -m venv .venv` | Membuat lingkungan Python proyek agar paketnya terpisah dari proyek lain. |
+| `source .venv/bin/activate` atau `Activate.ps1` | Mengarahkan perintah `python`/`pip` terminal aktif ke lingkungan proyek. Memanggil path lengkap interpreter `.venv` juga boleh. |
+| `python -m pip install --upgrade pip` | Memperbarui pemasang paket pada environment yang sedang dipakai. |
+| `python -m pip install -r requirements.txt` | Memasang pustaka pengolahan angka, sinyal, tabel, dan grafik yang diperlukan pipeline. |
+
+Tahap ini selesai ketika interpreter menunjuk `.venv` dan dependensi berhasil dipasang. Lanjutkan dengan pemeriksaan software di bawah, sebelum merekam data manusia.
+
 ## 2. Coba tanpa perangkat radio
+
+Tujuannya memastikan instalasi dan alur kode dapat bekerja sebelum masalah radio ikut masuk. Semua perintah di bawah dapat dijalankan tanpa HackRF terhubung.
 
 ```bash
 python case_b.py doctor
@@ -62,9 +78,30 @@ python case_b.py demo --seed 7
 python case_b.py plan
 ```
 
+| Perintah | Tujuan dan aktivitas | Hasil yang diperiksa |
+| --- | --- | --- |
+| `doctor` | Memeriksa paket, lokasi HackRF Tools, dan deteksi perangkat; tidak merekam. | `doctor.json`; perangkat boleh `unavailable` untuk pengujian offline, tetapi harus tersedia sebelum capture. |
+| `selftest` | Memeriksa kebenaran numerik dan validasi dengan data buatan kecil. | `tests.txt` berakhir `OK`. |
+| `demo --seed 7` | Membuat I/Q/CSI sintetis lalu menjalankan ekstraksi serta evaluasi untuk memperlihatkan alur lengkap. | Run selesai dan contoh grafik dapat dibuka; seluruhnya hasil software, bukan pengukuran napas. |
+| `plan` | Membuat jadwal trial serta template pencatatan agar eksperimen siap sebelum capture. | `jadwal_protokol.csv` dan template metadata/log yang perlu dilengkapi. |
+
 Setiap perintah mencetak `OUTPUT: ...` yang menunjukkan lokasi hasilnya. `demo` membuat pilot I/Q 1 detik, 33 trial CSI sintetis, dan evaluasi tiga fold. Ukurannya sekitar 70 MB dan membutuhkan puluhan detik, tergantung laptop. **Angka demo hanya verifikasi perangkat lunak, bukan bukti akurasi alat atau hasil studi manusia.** Gangguan RSSI sengaja dibuat dalam generator; perbandingan demo tidak membuktikan CSI lebih baik di dunia nyata.
 
 ## 3. Perintah untuk data nyata
+
+Tujuannya mengambil sinyal fisik dan mengubahnya menjadi estimasi yang bisa dibandingkan dengan hitungan napas pengamat. Sebelum mulai, ikuti pilot, penempatan perangkat, verifikasi pemancar, dan pengisian metadata pada [panduan pengerjaan](PANDUAN_IMPLEMENTASI.md#0-peta-pengerjaan-setiap-tahap-untuk-apa).
+
+| Tahap | Buat apa dan melakukan apa? | Kapan selesai? |
+| --- | --- | --- |
+| Metadata awal | Menyimpan identitas sesi/subjek, skenario, durasi, posisi, dan pengaturan sebelum mengambil data. | File JSON sesuai kondisi trial dan durasinya cocok dengan perintah capture. |
+| Pilot dengan `record` singkat | Memastikan kanal/gain/trafik dapat menghasilkan CSI yang layak sebelum trial utama. | QC paket/gap/clipping memenuhi batas dan asal pemancar tervalidasi. |
+| `record --duration 60` | Merekam I/Q dari HackRF, memeriksa ukuran file, lalu otomatis mengekstrak CSI. | Folder run berisi raw, CSI, QC, dan metadata; pengamat juga sudah mencatat napas aktual. |
+| `extract` jika raw sudah ada | Mengulang ekstraksi dari `.cs8` di disk tanpa merekam ulang. Ini alternatif pintu masuk, bukan langkah wajib setelah `record`. | CSI/QC tersedia dan sesuai metadata raw sumber. |
+| Metadata final | Menyalin metadata hasil run dan mengisi hitungan napas aktual sambil mempertahankan blok QC. | `actual_breath_count` berasal dari pengamat, bukan diisi otomatis dengan target metronom. |
+| `analyze` | Membersihkan/resample CSI, memfilter pita napas, menghitung FFT, dan membuat prediksi/grafik satu trial. | Amplitudo, spektrum, confidence, dan alasan penolakan sudah diperiksa. |
+| `dataset.csv` dan `evaluate` | Mengumpulkan seluruh trial dan menilai CSI versus RSSI dengan pemisahan sesi/orang latih–uji. | MAE/bias, coverage, QC, dan audit fold tersedia untuk dibahas dalam laporan. |
+
+Contoh perintah berikut menunjukkan sintaks masing-masing OS. `NAMA_RUN` dan path contoh harus diganti; jangan menjalankan semua baris tanpa lebih dahulu melengkapi metadata serta ground truth. Penjelasan langkah per langkah dan keputusan lanjut/ulang tersedia pada panduan pengerjaan.
 
 **Linux/macOS (Bash/Zsh):**
 
